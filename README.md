@@ -1,4 +1,5 @@
 ## Dork Generator
+<img width="512" height="512" alt="ChatGPT Image Aug 11, 2025, 01_04_49 AM" src="https://github.com/user-attachments/assets/6582569d-64f9-4040-9767-78d8b3f94320" />
 
 SEO-optimized web app to compose and generate Google dork queries. Includes:
 
@@ -19,6 +20,7 @@ npm i
 npm run dev
 # http://localhost:3000
 ```
+<img width="1470" height="956" alt="Screenshot 2025-08-11 at 3 56 33 AM" src="https://github.com/user-attachments/assets/c106fb6b-e68c-427e-b81a-afb450390246" />
 
 ### Use Python Backend (recommended)
 

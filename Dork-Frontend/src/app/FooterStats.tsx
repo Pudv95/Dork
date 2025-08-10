@@ -44,13 +44,13 @@ export default function FooterStats() {
         </div>
 
         <div className="flex items-center gap-3 md:justify-end">
-          <SocialLink href="https://github.com/your-org/your-repo" label="GitHub">
+          <SocialLink href="https://github.com/pudv95/dork" label="GitHub">
             <GitHubIcon />
           </SocialLink>
-          <SocialLink href="https://www.linkedin.com/in/your-profile" label="LinkedIn">
+          <SocialLink href="https://www.linkedin.com/in/pudv95" label="LinkedIn">
             <LinkedInIcon />
           </SocialLink>
-          <SocialLink href="https://x.com/your-handle" label="X">
+          <SocialLink href="https://x.com/pudv5" label="X">
             <XIcon />
           </SocialLink>
         </div>

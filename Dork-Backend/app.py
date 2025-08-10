@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from anthropic import Anthropic
 from dotenv import dotenv_values, find_dotenv
+import httpx
 from collections import deque
 import threading
 import time
@@ -15,6 +16,7 @@ from typing import Tuple
 class GenerateRequest(BaseModel):
     prompt: str
     current: dict | None = None
+    recaptchaToken: str | None = None
 
 
 def sanitize_query(text: str) -> str:
@@ -76,6 +78,30 @@ def _client_key(request: Request) -> str:
     else:
         ip = request.headers.get("x-real-ip") or (request.client.host if request.client else "unknown")
     return ip or "unknown"
+
+
+# --- reCAPTCHA v3 verification ----------------------------------------------
+def _verify_recaptcha(token: str | None, request: Request) -> bool:
+    secret = CONFIG.get("RECAPTCHA_SECRET")
+    if not secret:
+        return True
+    if not token:
+        return False
+    try:
+        remote_ip = request.headers.get("x-real-ip") or (request.client.host if request.client else None)
+        data = {"secret": secret, "response": token}
+        if remote_ip:
+            data["remoteip"] = remote_ip
+        with httpx.Client(timeout=5.0) as client:
+            resp = client.post("https://www.google.com/recaptcha/api/siteverify", data=data)
+            payload = resp.json()
+        ok = bool(payload.get("success"))
+        # For v3, optionally check score threshold
+        threshold = float(CONFIG.get("RECAPTCHA_MIN_SCORE", "0.5"))
+        score = float(payload.get("score", threshold))
+        return ok and score >= threshold
+    except Exception:
+        return False
 
 
 # --- Persistence (SQLite) ---------------------------------------------------
@@ -153,6 +179,8 @@ def generate(request: Request, body: GenerateRequest):
     ok, retry_after = _check_rate_limit(f"gen:{_client_key(request)}", GEN_MAX, GEN_WINDOW)
     if not ok:
         raise HTTPException(status_code=429, detail="Rate limit exceeded", headers={"Retry-After": str(retry_after)})
+    if not _verify_recaptcha(body.recaptchaToken, request):
+        raise HTTPException(status_code=400, detail="reCAPTCHA verification failed")
     api_key = CONFIG.get("ANTHROPIC_API_KEY")
     if not api_key:
         raise HTTPException(status_code=500, detail="Server missing ANTHROPIC_API_KEY")

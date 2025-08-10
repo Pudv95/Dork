@@ -2,6 +2,15 @@
 
 import { useMemo, useState } from "react";
 
+declare global {
+  interface Window {
+    grecaptcha?: {
+      ready: (cb: () => void) => void;
+      execute: (siteKey: string, options: { action: string }) => Promise<string>;
+    };
+  }
+}
+
 type PresetKey =
   | "none"
   | "login"
@@ -429,10 +438,12 @@ function useAIGenerator(setters: {
     try {
       const base = process.env.NEXT_PUBLIC_PY_BACKEND_URL || "";
       const endpoint = base ? `${base.replace(/\/$/, "")}/generate` : "/api/generate";
+      const recaptchaSiteKey = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY || "EFGH";
+      const recaptchaToken = await maybeGetRecaptchaToken(recaptchaSiteKey, "generate");
       const res = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt, current: getContext() }),
+        body: JSON.stringify({ prompt, current: getContext(), recaptchaToken }),
       });
       const contentType = res.headers.get("content-type") || "";
       const raw = await res.text();
@@ -458,4 +469,28 @@ function useAIGenerator(setters: {
       setIsGenerating(false);
     }
   };
+}
+
+async function maybeGetRecaptchaToken(siteKey: string | undefined, action: string): Promise<string | undefined> {
+  if (!siteKey) return undefined;
+  if (typeof window !== "undefined" && !window.grecaptcha) {
+    await new Promise<void>((resolve) => {
+      const script = document.createElement("script");
+      script.src = `https://www.google.com/recaptcha/api.js?render=${encodeURIComponent(siteKey)}`;
+      script.async = true;
+      script.onload = () => resolve();
+      document.head.appendChild(script);
+    });
+  }
+  if (!window.grecaptcha) return undefined;
+  return new Promise<string | undefined>((resolve) => {
+    window.grecaptcha!.ready(async () => {
+      try {
+        const token = await window.grecaptcha!.execute(siteKey!, { action });
+        resolve(token);
+      } catch {
+        resolve(undefined);
+      }
+    });
+  });
 }

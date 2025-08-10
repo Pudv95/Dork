@@ -17,6 +17,7 @@ class GenerateRequest(BaseModel):
     prompt: str
     current: dict | None = None
     recaptchaToken: str | None = None
+    visitorId: str | None = None
 
 
 def sanitize_query(text: str) -> str:
@@ -134,6 +135,21 @@ def _init_db() -> None:
             );
             """
         )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS prompts (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                visitor_id TEXT,
+                ip TEXT,
+                prompt TEXT NOT NULL,
+                query TEXT,
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP
+            );
+            """
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_prompts_created_at ON prompts(created_at);"
+        )
         conn.execute("INSERT OR IGNORE INTO metrics(key,value) VALUES('queries', 0);")
         conn.commit()
 
@@ -221,7 +237,21 @@ def generate(request: Request, body: GenerateRequest):
         raise HTTPException(status_code=422, detail="No query generated")
 
     _increment_queries()
+    try:
+        _insert_prompt(body.visitorId or "", _client_key(request), body.prompt, query)
+    except Exception:
+        # Do not fail the request if logging fails
+        pass
     return {"query": query}
+
+
+def _insert_prompt(visitor_id: str, ip: str, prompt: str, query: str) -> None:
+    with _get_conn() as conn:
+        conn.execute(
+            "INSERT INTO prompts(visitor_id, ip, prompt, query) VALUES(?,?,?,?);",
+            (visitor_id, ip, prompt, query),
+        )
+        conn.commit()
 
 
 class VisitRequest(BaseModel):

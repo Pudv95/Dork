@@ -443,7 +443,12 @@ function useAIGenerator(setters: {
       const res = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt, current: getContext(), recaptchaToken }),
+        body: JSON.stringify({
+          prompt,
+          current: getContext(),
+          recaptchaToken,
+          visitorId: getOrCreateVisitorId(),
+        }),
       });
       const contentType = res.headers.get("content-type") || "";
       const raw = await res.text();
@@ -493,4 +498,19 @@ async function maybeGetRecaptchaToken(siteKey: string | undefined, action: strin
       }
     });
   });
+}
+
+function getOrCreateVisitorId(): string {
+  const key = "dorkgen_visitor_id";
+  let value = "";
+  try {
+    value = localStorage.getItem(key) || "";
+  } catch {}
+  if (!value) {
+    value = crypto.randomUUID?.() || `${Date.now()}_${Math.random().toString(36).slice(2)}`;
+    try {
+      localStorage.setItem(key, value);
+    } catch {}
+  }
+  return value;
 }
